@@ -12,6 +12,8 @@
     "@angular/compiler-cli": "~21.0.0",
     "@angular/language-service": "~21.0.0",
     "@eslint/js": "^9.8.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
     "@nx/angular": "^22.3.3",
     "@nx/cypress": "22.3.3",
     "@nx/eslint": "22.3.3",
@@ -19,11 +21,14 @@
     "@nx/jest": "22.3.3",
     "@nx/js": "22.3.3",
     "@nx/nest": "^22.3.3",
+    "@nx/node": "22.3.3",
     "@nx/web": "22.3.3",
+    "@nx/webpack": "22.3.3",
     "@schematics/angular": "~21.0.0",
     "@swc-node/register": "~1.9.1",
     "@swc/core": "~1.5.7",
     "@swc/helpers": "~0.5.11",
+    "@swc/jest": "~0.2.38",
     "@types/jest": "^30.0.0",
     "@types/node": "20.19.9",
     "@typescript-eslint/utils": "^8.40.0",
@@ -34,6 +39,7 @@
     "eslint-plugin-cypress": "^3.5.0",
     "jest": "^30.0.2",
     "jest-environment-jsdom": "^30.0.2",
+    "jest-environment-node": "^30.0.2",
     "jest-preset-angular": "~16.0.0",
     "jest-util": "^30.0.2",
     "nx": "22.3.3",
@@ -42,10 +48,13 @@
     "ts-node": "10.9.1",
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
-    "typescript-eslint": "^8.40.0"
+    "typescript-eslint": "^8.40.0",
+    "webpack-cli": "^5.1.4"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "api",
+    "api-e2e"
   ],
   "dependencies": {
     "@angular/common": "~21.0.0",
@@ -55,6 +64,11 @@
     "@angular/platform-browser": "~21.0.0",
     "@angular/platform-browser-dynamic": "~21.0.0",
     "@angular/router": "~21.0.0",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "axios": "^1.6.0",
+    "reflect-metadata": "^0.1.13",
     "rxjs": "~7.8.0"
   }
 }
