@@ -46,3 +46,9 @@ Thumbs.db
 .angular
 
 test-output
+
+# Local SQLite database
+data.sqlite
+*.sqlite
+*.sqlite3
+
