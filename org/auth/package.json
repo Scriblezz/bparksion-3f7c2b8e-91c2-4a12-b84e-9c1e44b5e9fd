@@ -25,5 +25,7 @@
       }
     }
   },
-  "dependencies": {}
+  "dependencies": {
+    "@org/data": "0.0.1"
+  }
 }
