@@ -6,6 +6,18 @@
 
 [Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/js?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
 
+## Auth seed users
+
+When you start the API (`npx nx serve api`), a development-only seed runs automatically if no users exist. It creates one organization and three users that all share the same password. Use these credentials to log in immediately:
+
+| Role  | Email               | Password |
+| ----- | ------------------- | -------- |
+| owner | owner@example.com   | `Passw0rd!` |
+| admin | admin@example.com   | `Passw0rd!` |
+| viewer| viewer@example.com  | `Passw0rd!` |
+
+Override the password by setting `SEED_USER_PASSWORD` before starting the API. The seed first checks for existing users, so it will not overwrite data that you have already created.
+
 ## Generate a library
 
 ```sh
