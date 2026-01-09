@@ -55,10 +55,11 @@
   },
   "workspaces": [
     "packages/*",
-    "api",
+    "apps/api",
+    "apps/dashboard",
     "api-e2e",
-    "data",
-    "auth"
+    "libs/data",
+    "libs/auth"
   ],
   "dependencies": {
     "@angular/common": "~21.0.0",

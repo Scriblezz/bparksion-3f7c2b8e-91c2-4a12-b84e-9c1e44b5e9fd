@@ -31,7 +31,7 @@
           "watchDepsName": "watch-deps"
         }
       },
-      "exclude": ["auth/*"]
+      "exclude": ["libs/auth/*"]
     },
     {
       "plugin": "@nx/cypress/plugin",
@@ -61,7 +61,7 @@
     },
     {
       "plugin": "@nx/js/typescript",
-      "include": ["auth/*"],
+      "include": ["libs/auth/*"],
       "options": {
         "typecheck": {
           "targetName": "typecheck"

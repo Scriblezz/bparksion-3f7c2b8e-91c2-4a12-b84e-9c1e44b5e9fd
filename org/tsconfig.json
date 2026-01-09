@@ -10,16 +10,16 @@
       "path": "./api-e2e"
     },
     {
-      "path": "./api"
+      "path": "./apps/api"
     },
     {
-      "path": "./dashboard"
+      "path": "./apps/dashboard"
     },
     {
-      "path": "./data"
+      "path": "./libs/data"
     },
     {
-      "path": "./auth"
+      "path": "./libs/auth"
     }
   ]
 }
