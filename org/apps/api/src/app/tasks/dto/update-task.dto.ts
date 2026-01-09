@@ -5,4 +5,6 @@ export interface UpdateTaskDto {
   description?: string;
   status?: TaskStatus;
   ownerId?: number;
+  category?: string;
+  position?: number;
 }

@@ -1,116 +1,195 @@
-# New Nx Repository
+# Org Task Command Center (Nx + NestJS + Angular)
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+A full-stack Nx workspace that delivers an organization-aware task board. The NestJS API enforces JWT-based RBAC with audit logging, while the Angular dashboard provides drag-and-drop task management, filtering, completion insights, and keyboard shortcuts.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+---
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/js?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+## Setup Instructions
 
-## Auth seed users
+### 1. Prerequisites
+- Node.js 18+ (tested with 20.11)
+- npm 9+, git, and SQLite (bundled with Node; no separate server is required)
+- Recommended: VS Code with the Nx Console extension
 
-When you start the API (`npx nx serve api`), a development-only seed runs automatically if no users exist. It creates one organization and three users that all share the same password. Use these credentials to log in immediately:
-
-| Role  | Email               | Password |
-| ----- | ------------------- | -------- |
-| owner | owner@example.com   | `Passw0rd!` |
-| admin | admin@example.com   | `Passw0rd!` |
-| viewer| viewer@example.com  | `Passw0rd!` |
-
-Override the password by setting `SEED_USER_PASSWORD` before starting the API. The seed first checks for existing users, so it will not overwrite data that you have already created.
-
-## Generate a library
-
-```sh
-npx nx g @nx/js:lib packages/pkg1 --publishable --importPath=@my-org/pkg1
+### 2. Install dependencies
+```bash
+npm install
 ```
 
-## Run tasks
+### 3. Environment variables (`.env`)
+Create an `.env` file in the repo root (or any path you prefer) and populate it with the variables the API reads via `process.env`:
 
-To build the library use:
-
-```sh
-npx nx build pkg1
+```bash
+# .env
+JWT_SECRET=dev_super_secret_key
+SEED_USER_PASSWORD=Passw0rd!
+DATABASE_FILE=./data.sqlite
 ```
 
-To run any task with Nx use:
+Load the file before running Nx commands. Two portable options:
 
-```sh
-npx nx <target> <project-name>
+- **macOS/Linux**: `NODE_OPTIONS="--env-file=.env" npx nx serve api`
+- **Windows PowerShell**:
+  ```powershell
+  $env:NODE_OPTIONS="--env-file=.env"
+  npx nx serve api
+  ```
+
+> `JWT_SECRET` secures issued tokens, `SEED_USER_PASSWORD` controls the auto-seeded demo accounts, and `DATABASE_FILE` overrides the default SQLite location used in [apps/api/src/app/db/typeorm.config.ts](apps/api/src/app/db/typeorm.config.ts#L3-L18).
+
+### 4. Run the backend (NestJS API)
+```bash
+# Terminal 1
+NODE_OPTIONS="--env-file=.env" npx nx serve api
+```
+- Serves on `http://localhost:3000`
+- Seeds three users (owner/admin/viewer) exactly once when the database is empty via [apps/api/src/app/seed/seed.service.ts](apps/api/src/app/seed/seed.service.ts#L7-L54)
+- Hot reloads when server files change
+
+**Default seed accounts**
+
+| Role | Email | Password |
+| --- | --- | --- |
+| owner | owner@example.com | `Passw0rd!` (or `SEED_USER_PASSWORD`) |
+| admin | admin@example.com | `Passw0rd!` |
+| viewer | viewer@example.com | `Passw0rd!` |
+
+### 5. Run the dashboard (Angular)
+```bash
+# Terminal 2
+npx nx serve dashboard --proxy-config apps/dashboard/proxy.conf.json
+```
+- Serves on `http://localhost:4200`
+- Proxy config forwards `/api` requests to the backend so the Angular `HttpClient` can call relative paths (see [apps/dashboard/src/app/tasks/tasks.service.ts](apps/dashboard/src/app/tasks/tasks.service.ts#L1-L33))
+
+### 6. Optional quality checks
+```bash
+npx nx run-many -t lint,test --projects=api,dashboard
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+---
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Architecture Overview
 
-## Versioning and releasing
+| Scope | Path | Notes |
+| --- | --- | --- |
+| API app | [apps/api](apps/api) | NestJS monolith exposing authentication, tasks, and audit log endpoints. Modules: `AuthModule`, `TasksModule`, `AuditLogModule`, and infrastructure helpers (TypeORM config, seed service). |
+| Dashboard app | [apps/dashboard](apps/dashboard) | Angular standalone app with CDK drag-drop, reactive forms, and signals. Auth + tasks features live under `src/app`. |
+| Shared auth lib | [libs/auth](libs/auth) | Provides `JwtAuthGuard`, `JwtStrategy`, `RolesGuard`, decorators, and audit helpers so API modules share the same RBAC primitives. |
+| Shared data lib | [libs/data](libs/data) | TypeORM entities (Organization, User, Task, AuditLog) plus exported types reused on both API and shared tooling. |
 
-To version and release the library use
+**Why NX?**
+- A single dependency graph lets us share guards/entities without duplicating code.
+- `run-many`, affected command graph, and caching make it easy to test API and UI together.
+- Each app keeps its own tsconfig/project.json while still sharing lint/test presets.
 
-```
-npx nx release
-```
+---
 
-Pass `--dry-run` to see what would happen without actually releasing the library.
+## Data Model Explanation
 
-[Learn more about Nx release &raquo;](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+| Entity | Definition | Highlights |
+| --- | --- | --- |
+| Organization | [libs/data/src/lib/entities/organization.entity.ts](libs/data/src/lib/entities/organization.entity.ts#L1-L17) | Supports parent/child relationships for future multi-tenant hierarchies. |
+| User | [libs/data/src/lib/entities/user.entity.ts](libs/data/src/lib/entities/user.entity.ts#L1-L24) | Stores `email`, `passwordHash`, `role` (`owner` > `admin` > `viewer`), and the owning organization (eagerly loaded). |
+| Task | [libs/data/src/lib/entities/task.entity.ts](libs/data/src/lib/entities/task.entity.ts#L1-L43) | Tracks status (`todo`, `in-progress`, `done`), category, swimlane position, owner, organization, plus timestamps for board sorting. |
+| AuditLog | [libs/data/src/lib/entities/audit-log.entity.ts](libs/data/src/lib/entities/audit-log.entity.ts#L1-L30) | Persists allow/deny actions, reasons, and arbitrary JSON `details` for forensics. |
 
-## Keep TypeScript project references up to date
-
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` or `require` statements). This sync is automatically done when running tasks such as `build` or `typecheck`, which require updated references to function correctly.
-
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
-
-```sh
-npx nx sync
-```
-
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
-
-```sh
-npx nx sync:check
-```
-
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
-
-## Nx Cloud
-
-Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
-
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Set up CI (non-Github Actions CI)
-
-**Note:** This is only required if your CI provider is not GitHub Actions.
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
+```mermaid
+erDiagram
+  Organization ||--o{ Organization : children
+  Organization ||--o{ User : "has members"
+  Organization ||--o{ Task : "owns tasks"
+  User ||--o{ Task : "is owner"
+  Organization ||--o{ AuditLog : "records events"
 ```
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+- Every user belongs to exactly one organization; `Organization.parent` enables delegation trees later.
+- Tasks enforce organization alignment on creation and updates (see [apps/api/src/app/tasks/tasks.service.ts](apps/api/src/app/tasks/tasks.service.ts#L17-L193)).
+- Audit entries are created for both allow and deny decisions so suspicious attempts are captured even when blocked.
 
-## Install Nx Console
+---
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+## Access Control Implementation
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### Role hierarchy & permissions
+- Roles live on the user entity and are compared via `hasRoleOrHigher` in [libs/auth/src/lib/role.utils.ts](libs/auth/src/lib/role.utils.ts#L1-L32). The ascending order is `viewer < admin < owner`.
+- `RolesGuard` ([libs/auth/src/lib/roles.guard.ts](libs/auth/src/lib/roles.guard.ts#L1-L49)) reads `@Roles(...)` metadata and denies requests when the caller’s role rank is below the requirement. Decisions are logged via [libs/auth/src/lib/audit-logger.service.ts](libs/auth/src/lib/audit-logger.service.ts#L1-L41).
+- Task mutations include organization and ownership checks (`isSameOrganization`, `isResourceOwner`) so even admins cannot cross tenant boundaries.
 
-## Useful links
+### JWT authentication flow
+1. `POST /auth/login` ([apps/api/src/app/auth/auth.controller.ts](apps/api/src/app/auth/auth.controller.ts#L6-L22)) validates credentials against hashed passwords via [AuthService](apps/api/src/app/auth/auth.service.ts#L10-L39).
+2. Upon success, the API issues a signed JWT describing `sub`, `email`, `role`, and `orgId`. The signing and validation logic resides in [libs/auth/src/lib/jwt.strategy.ts](libs/auth/src/lib/jwt.strategy.ts#L1-L34).
+3. The Angular client saves the token in localStorage through [apps/dashboard/src/app/auth/token-storage.service.ts](apps/dashboard/src/app/auth/token-storage.service.ts#L3-L22) and attaches it with the [HTTP interceptor](apps/dashboard/src/app/auth/auth.interceptor.ts#L1-L20).
+4. Protected routes require `JwtAuthGuard` plus `RolesGuard`, guaranteeing both authentication and authorization checks before hitting business logic.
 
-Learn more:
+---
 
-- [Learn more about this workspace setup](https://nx.dev/nx-api/js?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## API Docs
 
-And join the Nx community:
+Base URL: `http://localhost:3000`
+Authentication: `Authorization: Bearer <token>` for every route except `POST /auth/login`.
 
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### Auth
+
+| Method | Path | Description |
+| --- | --- | --- |
+| POST | `/auth/login` | Exchange email/password for a JWT. |
+| GET | `/auth/me` | Returns the caller profile extracted from the JWT. |
+
+**Sample**
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"owner@example.com","password":"Passw0rd!"}'
+```
+Response
+```json
+{ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+```
+
+### Tasks
+
+| Method | Path | Roles | Notes |
+| --- | --- | --- | --- |
+| GET | `/tasks` | viewer+ | Returns tasks scoped to the caller’s organization (viewers only see their own). |
+| POST | `/tasks` | admin+ | Creates a task; auto-assigns swimlane position. |
+| PUT | `/tasks/:id` | admin+ | Updates title, description, status, category, owner, or position. |
+| DELETE | `/tasks/:id` | admin+ | Removes a task and logs the deletion. |
+| POST | `/tasks/reorder` | admin+ | Bulk reorder of a swimlane by sending `{ "status": "in-progress", "taskIds": [3,1,4] }`. |
+
+Example response for `GET /tasks`:
+```json
+[
+  {
+    "id": 12,
+    "title": "Draft Q1 report",
+    "status": "in-progress",
+    "category": "Work",
+    "position": 1,
+    "owner": { "id": 2, "email": "admin@example.com" },
+    "organization": { "id": 1, "name": "Seed Organization" }
+  }
+]
+```
+
+### Audit Log
+
+| Method | Path | Roles | Description |
+| --- | --- | --- | --- |
+| GET | `/audit-log` | admin+ | Returns the 100 most recent audit entries for the caller’s organization. Each entry includes `action`, `status (ALLOW/DENY)`, `reason`, and timestamps. |
+
+---
+
+## Future Considerations
+
+1. **Advanced role delegation** – Extend the Organization hierarchy so owners can grant scoped permissions (e.g., project-level managers) and inherit policies down the tree.
+2. **Production-ready security hardening** – Add refresh tokens + rotation, CSRF/PKCE for SPAs, configurable password policies, secret management (Key Vault/Azure App Config), and caching for RBAC lookups to remove repeated database hits.
+3. **Efficient permission evaluation at scale** – Introduce memoized policy engines or attribute-based access control (ABAC) so bulk operations (like large task reorders) can authorize thousands of records without per-row SQL checks.
+
+---
+
+## Appendix
+- Seeded credentials live in the table at the top of this document; override the password via `SEED_USER_PASSWORD`.
+- Update TypeORM to a production-ready database (PostgreSQL/Azure Cosmos DB with PostgreSQL wire protocol, etc.) by editing [apps/api/src/app/db/typeorm.config.ts](apps/api/src/app/db/typeorm.config.ts#L3-L18).
+- Review audit output via `nx serve api` logs or by querying `/audit-log` as an owner/admin.# New Nx Repository
+

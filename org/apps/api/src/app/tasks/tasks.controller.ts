@@ -4,6 +4,7 @@ import { JwtAuthGuard, JwtUser, Roles, RolesGuard } from '@org/auth';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TasksService } from './tasks.service';
+import { ReorderTasksDto } from './dto/reorder-tasks.dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,5 +37,11 @@ export class TasksController {
   @Roles('admin', 'owner')
   remove(@Req() req: Request & { user: JwtUser }, @Param('id', ParseIntPipe) id: number) {
     return this.tasks.remove(req.user, id);
+  }
+
+  @Post('reorder')
+  @Roles('admin', 'owner')
+  reorder(@Req() req: Request & { user: JwtUser }, @Body() dto: ReorderTasksDto) {
+    return this.tasks.reorder(req.user, dto.status, dto.taskIds);
   }
 }

@@ -16,6 +16,7 @@ describe('TasksDashboardComponent', () => {
     create: jest.Mock;
     update: jest.Mock;
     delete: jest.Mock;
+    reorder: jest.Mock;
   };
   let router: { navigateByUrl: jest.Mock };
 
@@ -45,6 +46,7 @@ describe('TasksDashboardComponent', () => {
       create: jest.fn().mockResolvedValue({}),
       update: jest.fn(),
       delete: jest.fn(),
+      reorder: jest.fn().mockResolvedValue({ success: true }),
     };
 
     router = {
@@ -76,6 +78,8 @@ describe('TasksDashboardComponent', () => {
         title: 'Seed task',
         description: 'owned by viewer',
         status: 'todo',
+        category: 'General',
+        position: 0,
         owner: { id: viewerUser.id, email: viewerUser.email, role: 'viewer' },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -88,7 +92,7 @@ describe('TasksDashboardComponent', () => {
     expect(tasksService.list).toHaveBeenCalledTimes(1);
     expect(fixture.componentInstance.tasks()).toEqual(taskList);
 
-    const cards = fixture.nativeElement.querySelectorAll('article');
+    const cards = fixture.nativeElement.querySelectorAll('.task-card');
     expect(cards.length).toBe(1);
     expect(cards[0].textContent).toContain('Seed task');
   });
@@ -97,7 +101,7 @@ describe('TasksDashboardComponent', () => {
     await renderComponent();
 
     const button: HTMLButtonElement = fixture.nativeElement.querySelector(
-      'aside form button[type="submit"]'
+      '.panels form button[type="submit"]'
     );
     expect(button.disabled).toBe(true);
 
@@ -112,9 +116,11 @@ describe('TasksDashboardComponent', () => {
       title: 'New task',
       description: 'owner created',
       status: 'todo',
+      category: 'General',
       owner: { id: ownerUser.id, email: ownerUser.email, role: 'owner' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      position: 0,
     };
 
     tasksService.create.mockResolvedValue(createdTask);
@@ -125,6 +131,7 @@ describe('TasksDashboardComponent', () => {
       title: 'New task',
       description: 'owner created',
       status: 'todo',
+      category: 'General',
     });
 
     tasksService.list.mockClear();
@@ -134,6 +141,7 @@ describe('TasksDashboardComponent', () => {
       title: 'New task',
       description: 'owner created',
       status: 'todo',
+      category: 'General',
     });
     expect(tasksService.list).toHaveBeenCalledTimes(1);
   });

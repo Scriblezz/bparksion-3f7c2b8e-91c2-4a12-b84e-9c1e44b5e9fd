@@ -3,6 +3,8 @@ export interface Task {
   title: string;
   description?: string;
   status: 'todo' | 'in-progress' | 'done';
+  category: string;
+  position: number;
   owner: {
     id: number;
     email: string;
@@ -16,4 +18,5 @@ export interface UpsertTaskPayload {
   title?: string;
   description?: string;
   status?: 'todo' | 'in-progress' | 'done';
+  category?: string;
 }

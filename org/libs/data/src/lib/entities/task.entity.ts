@@ -25,6 +25,12 @@ export class Task {
   @Column({ type: 'text', default: 'todo' })
   status!: TaskStatus;
 
+  @Column({ type: 'text', default: 'general' })
+  category!: string;
+
+  @Column({ type: 'integer', default: 0 })
+  position!: number;
+
   @ManyToOne(() => Organization, { eager: true })
   organization!: Organization;
 

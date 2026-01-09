@@ -5,4 +5,5 @@ export interface CreateTaskDto {
   description?: string;
   status?: TaskStatus;
   ownerId?: number;
+  category?: string;
 }

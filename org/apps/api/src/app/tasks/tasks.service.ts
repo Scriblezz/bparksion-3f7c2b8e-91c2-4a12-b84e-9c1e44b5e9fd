@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Task, User } from '@org/data';
-import { Repository } from 'typeorm';
+import { Task, TaskStatus, User } from '@org/data';
+import { In, Repository } from 'typeorm';
 import { JwtUser, hasRoleOrHigher, isSameOrganization } from '@org/auth';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -22,14 +22,37 @@ export class TasksService {
     return user.orgId;
   }
 
+  private normalizeCategory(category?: string): string {
+    if (!category) return 'General';
+    const trimmed = category.trim();
+    if (!trimmed) return 'General';
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+
+  private async nextPosition(orgId: number, status: TaskStatus): Promise<number> {
+    const result = await this.taskRepo
+      .createQueryBuilder('task')
+      .select('MAX(task.position)', 'max')
+      .where('task.organizationId = :orgId', { orgId })
+      .andWhere('task.status = :status', { status })
+      .getRawOne<{ max: number | null }>();
+
+    return (result?.max ?? -1) + 1;
+  }
+
   async create(user: JwtUser, dto: CreateTaskDto) {
     const orgId = this.ensureOrg(user);
     const owner = await this.resolveOwner(user, dto.ownerId ?? user.id);
+    const status = dto.status ?? 'todo';
+    const category = this.normalizeCategory(dto.category);
+    const position = await this.nextPosition(orgId, status);
 
     const task = this.taskRepo.create({
       title: dto.title,
       description: dto.description,
-      status: dto.status ?? 'todo',
+      status,
+      category,
+      position,
       organization: owner.organization!,
       owner,
     });
@@ -55,7 +78,11 @@ export class TasksService {
       .leftJoinAndSelect('task.owner', 'owner')
       .leftJoinAndSelect('task.organization', 'organization')
       .where('organization.id = :orgId', { orgId })
-      .orderBy('task.createdAt', 'DESC');
+      .orderBy(
+        `CASE task.status WHEN 'todo' THEN 0 WHEN 'in-progress' THEN 1 ELSE 2 END`,
+        'ASC'
+      )
+      .addOrderBy('task.position', 'ASC');
 
     if (user.role === 'viewer') {
       qb.andWhere('owner.id = :ownerId', { ownerId: user.id });
@@ -70,12 +97,24 @@ export class TasksService {
 
     if (dto.title !== undefined) task.title = dto.title;
     if (dto.description !== undefined) task.description = dto.description;
-    if (dto.status !== undefined) task.status = dto.status;
+    if (dto.category !== undefined) task.category = this.normalizeCategory(dto.category);
+
+    if (dto.status !== undefined && dto.status !== task.status) {
+      task.status = dto.status;
+      if (dto.position == null) {
+        task.position = await this.nextPosition(task.organization.id, task.status);
+      }
+    }
+
+    if (dto.position != null) {
+      task.position = dto.position;
+    }
 
     if (dto.ownerId && dto.ownerId !== task.owner.id) {
       const newOwner = await this.resolveOwner(user, dto.ownerId);
       task.owner = newOwner;
       task.organization = newOwner.organization!;
+      task.position = await this.nextPosition(task.organization.id, task.status);
     }
 
     const saved = await this.taskRepo.save(task);
@@ -165,5 +204,52 @@ export class TasksService {
       resourceId,
       reason,
     });
+  }
+
+  async reorder(user: JwtUser, status: TaskStatus, taskIds: number[]) {
+    const orgId = this.ensureOrg(user);
+    if (!hasRoleOrHigher(user.role, 'admin')) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
+    if (!taskIds.length) {
+      return { success: true };
+    }
+
+    const tasks = await this.taskRepo.find({
+      where: { id: In(taskIds) },
+      relations: { organization: true, owner: true },
+    });
+
+    const tasksById = new Map(tasks.map((task) => [task.id, task]));
+    for (const id of taskIds) {
+      if (!tasksById.has(id)) {
+        throw new NotFoundException(`Task ${id} not found`);
+      }
+    }
+
+    const updates: Task[] = [];
+    taskIds.forEach((taskId, index) => {
+      const task = tasksById.get(taskId)!;
+      if (!isSameOrganization(user, task.organization.id)) {
+        throw new ForbiddenException('Cross-organization access denied');
+      }
+      task.status = status;
+      task.position = index;
+      updates.push(task);
+    });
+
+    await this.taskRepo.save(updates);
+
+    await this.auditLog.record({
+      action: 'TASK_REORDER',
+      status: 'ALLOW',
+      userId: user.id,
+      organizationId: orgId,
+      resourceType: 'task',
+      details: { status, order: taskIds },
+    });
+
+    return { success: true };
   }
 }

@@ -24,4 +24,13 @@ export class TasksService {
   delete(id: number): Promise<{ success: boolean }> {
     return firstValueFrom(this.http.delete<{ success: boolean }>(`${API_BASE}/${id}`));
   }
+
+  reorder(status: Task['status'], taskIds: number[]): Promise<{ success: boolean }> {
+    return firstValueFrom(
+      this.http.post<{ success: boolean }>(`${API_BASE}/reorder`, {
+        status,
+        taskIds,
+      })
+    );
+  }
 }
